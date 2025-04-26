@@ -16,16 +16,21 @@ def create_connection(db_name, user, password, host='localhost', port='5432'):
         print(f"The error '{e}' occurred")
     return conn
 
-def execute_query(connection, query):
+def execute_query(connection, query, params=None):
     """Execute a single query."""
     cursor = connection.cursor()
     try:
-        cursor.execute(query)
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
         connection.commit()
         print("Query executed successfully")
     except Exception as e:
         print(f"The error '{e}' occurred")
         connection.rollback()
+    finally:
+        cursor.close()
 
 def execute_read_query(connection, query):
     """Execute a read query and return the results."""
