@@ -38,14 +38,6 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
-@bot.tree.command(name="zenci", description="Random zenci foto")
-async def zenci(interaction: discord.Interaction):
-    images = os.listdir("./files/zenciler")    
-    random_image = os.path.join("./files/zenciler", random.choice(images))
-
-    await interaction.response.send_message(file=discord.File(random_image))
-
-
 @bot.tree.command(name="pipikontrol", description="Pipi kontrolünü sağlar.")
 async def pipikontrol(interaction: discord.Interaction):
     text = "❗🚨  PİPİ KONTROL  🚨❗\n\n👇  İnik\n\n👆  Kalkık\n"
@@ -125,7 +117,7 @@ async def announce_results(poll_message, poll):
     del active_polls[poll_message.id]
 
 
-@bot.tree.command(name="yazkenara", description="Yaz kenara, bi gün lazım olur.")
+@bot.tree.command(name="yazkenara", description="Atasözü oluştur")
 async def yazkenara(interaction: discord.Interaction, mesaj: str):
     if not mesaj:
         interaction.response.send_message("Mesaj boş olamaz!", ephemeral=True)
@@ -147,9 +139,33 @@ async def yazkenara(interaction: discord.Interaction, mesaj: str):
     execute_query(connection, query, values)
     connection.close()
 
-    interaction.response.send_message(f"@{username} kenara yazdı ✍: {mesaj}")
-    # interaction.response.send_message("Yazdım kenara ✍", ephemeral=True)
+    await interaction.response.send_message(f"<@{user_id}> atasözü ekledi: ***{mesaj}***")
     
+
+@bot.tree.command(name="atasozu", description="Random atasözü")
+async def atasozu(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    query = f"SELECT user_id, message FROM messages WHERE guild_id = {guild_id} ORDER BY RANDOM() LIMIT 1"
+    
+    connection = create_connection(DB_NAME, USER, PASSWORD, HOST, PORT)
+    result = execute_read_query(connection, query)
+    connection.close()
+
+    if not result:
+            await interaction.response.send_message("Henüz kimse bir söz yazmamış 😢")
+            return
+    
+    user_id, message = result[0]
+    templates = [
+        "Bir zamanlar bilge bir adam olan <@{user_id}> demişti ki: ***{message}***",
+        "Ünlü Japon bilim adamı <@{user_id}> bir gün şöyle demişti: ***{message}***",
+        "Antik Yunan filozofu <@{user_id}> vaktiyle şöyle buyurmuştu: ***{message}***",
+        "<@{user_id}> bir gün dedi ki: ***{message}***",
+        "Tarihin tozlu sayfalarından: <@{user_id}> şöyle demiş: ***{message}***"
+    ]
+    template = random.choice(templates)
+    response = template.format(user_id=user_id, message=message)
+    await interaction.response.send_message(response)
 
 if __name__ == "__main__":
     if not TOKEN:
