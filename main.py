@@ -6,11 +6,18 @@ import random
 import math
 
 from dotenv import load_dotenv
+from db import create_connection, execute_query, execute_read_query
 
 load_dotenv()
 
-bot = commands.Bot(command_prefix=commands.when_mentioned_or('/'), intents=discord.Intents.all())
+TOKEN = os.getenv("DISCORD_TOKEN")
+DB_NAME = os.getenv("DB_NAME")
+USER = os.getenv("USER")
+PASSWORD = os.getenv("PASSWORD")
+HOST = os.getenv("HOST")
+PORT = os.getenv("PORT")
 
+bot = commands.Bot(command_prefix=commands.when_mentioned_or('/'), intents=discord.Intents.all())
 
 @bot.event
 async def on_ready():
@@ -118,9 +125,57 @@ async def announce_results(poll_message, poll):
     del active_polls[poll_message.id]
 
 
+@bot.tree.command(name="yazkenara", description="Yaz kenara, bi gün lazım olur.")
+async def yazkenara(interaction: discord.Interaction, mesaj: str):
+    if not mesaj:
+        interaction.response.send_message("Mesaj boş olamaz!", ephemeral=True)
+        return
+
+    query = """
+        INSERT INTO messages (guild_id, user_id, username, message, datetime)
+        VALUES (%s, %s, %s, %s, %s)
+    """
+
+    guild_id = interaction.guild.id
+    user_id = interaction.user.id
+    username = interaction.user.name
+    message = mesaj
+    datetime = interaction.created_at
+    values = (guild_id, user_id, username, message, datetime)
+
+    connection = create_connection(DB_NAME, USER, PASSWORD, HOST, PORT)
+    execute_query(connection, query, values)
+    connection.close()
+
+    interaction.response.send_message(f"@{username} kenara yazdı ✍: {mesaj}")
+    # interaction.response.send_message("Yazdım kenara ✍", ephemeral=True)
+    
+
 if __name__ == "__main__":
-    TOKEN = os.getenv("DISCORD_TOKEN")
     if not TOKEN:
         raise ValueError("DISCORD_TOKEN not found in environment variables.")
+
+    if not all([DB_NAME, USER, PASSWORD, HOST, PORT]):
+        raise ValueError("Database connection details not found in environment variables.")
+
+    connection = create_connection(DB_NAME, USER, PASSWORD, HOST, PORT)
+
+    if connection is None:
+        raise ValueError("Database connection failed.")
     
+    # Create the messages table if it doesn't exist
+    query = """CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    username TEXT NOT NULL,
+    message TEXT NOT NULL,
+    datetime TIMESTAMP NOT NULL
+    );
+    """
+
+    execute_query(connection, query)
+
+    connection.close()
+
     bot.run(TOKEN)
