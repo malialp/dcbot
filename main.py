@@ -139,7 +139,7 @@ async def yazkenara(interaction: discord.Interaction, mesaj: str):
     execute_query(connection, query, values)
     connection.close()
 
-    await interaction.response.send_message(f"<@{user_id}> atasözü ekledi: ***{mesaj}***")
+    await interaction.response.send_message(f"Yeni bir atasözü ekledin: ***{mesaj}***", ephemeral=True)
     
 
 @bot.tree.command(name="atasozu", description="Random atasözü")
