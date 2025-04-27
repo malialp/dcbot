@@ -12,3 +12,4 @@ wheels/
 
 tests/
 files/
+*.session.sql

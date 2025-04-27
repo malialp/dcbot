@@ -7,7 +7,7 @@ import math
 
 from dotenv import load_dotenv
 from db import create_connection, execute_query, execute_read_query
-
+from messages import bira_answers, atasozu_templates
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -34,6 +34,10 @@ async def on_message(message):
     
     if message.content.lower() == "sa":
         await message.channel.send("as")
+
+    if "bira" in message.content.lower():
+        await message.channel.send(random.choice(bira_answers))
+        await message.add_reaction("🍻")
 
     await bot.process_commands(message)
 
@@ -156,14 +160,8 @@ async def atasozu(interaction: discord.Interaction):
             return
     
     user_id, message = result[0]
-    templates = [
-        "Bir zamanlar bilge bir adam olan <@{user_id}> demişti ki: ***{message}***",
-        "Ünlü Japon bilim adamı <@{user_id}> bir gün şöyle demişti: ***{message}***",
-        "Antik Yunan filozofu <@{user_id}> vaktiyle şöyle buyurmuştu: ***{message}***",
-        "<@{user_id}> bir gün dedi ki: ***{message}***",
-        "Tarihin tozlu sayfalarından: <@{user_id}> şöyle demiş: ***{message}***"
-    ]
-    template = random.choice(templates)
+
+    template = random.choice(atasozu_templates)
     response = template.format(user_id=user_id, message=message)
     await interaction.response.send_message(response)
 
