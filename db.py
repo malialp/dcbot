@@ -11,7 +11,6 @@ def create_connection(db_name, user, password, host='localhost', port='5432'):
             host=host,
             port=port
         )
-        print("Connection to PostgreSQL DB successful")
     except Exception as e:
         print(f"The error '{e}' occurred")
     return conn
@@ -25,19 +24,21 @@ def execute_query(connection, query, params=None):
         else:
             cursor.execute(query)
         connection.commit()
-        print("Query executed successfully")
     except Exception as e:
         print(f"The error '{e}' occurred")
         connection.rollback()
     finally:
         cursor.close()
 
-def execute_read_query(connection, query):
+def execute_read_query(connection, query, params=None):
     """Execute a read query and return the results."""
     cursor = connection.cursor()
     result = None
     try:
-        cursor.execute(query)
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
         result = cursor.fetchall()
         return result
     except Exception as e:

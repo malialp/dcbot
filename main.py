@@ -2,12 +2,15 @@ import discord
 from discord.ext import commands
 
 import os
+import re
 import random
 import math
 
 from dotenv import load_dotenv
 from db import create_connection, execute_query, execute_read_query
 from messages import bira_answers, atasozu_templates
+from utils import validate_film_url, validate_spotify_url
+
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -29,8 +32,6 @@ async def on_ready():
 async def on_message(message):
     if message.author == bot.user:
         return
-
-    print(f"{message.author} ({message.author.id}): {message.content}")
     
     if message.content.lower() == "sa":
         await message.channel.send("as")
@@ -53,7 +54,7 @@ async def pipikontrol(interaction: discord.Interaction):
 
 active_polls = {}
 
-@bot.tree.command(name="anket", description="Anket oluştur")
+@bot.tree.command(name="anket", description="Anket oluşturur. En az 2 seçenek gereklidir.")
 async def anket(interaction: discord.Interaction, question: str, option1: str, option2: str, option3: str = None, option4: str = None, option5: str = None,
                 option6: str = None, option7: str = None, option8: str = None, option9: str = None, option10: str = None):
     options = [option for option in [option1, option2, option3, option4, option5, option6, option7, option8, option9, option10] if option]
@@ -146,7 +147,7 @@ async def yazkenara(interaction: discord.Interaction, mesaj: str):
     await interaction.response.send_message(f"Yeni bir atasözü ekledin: ***{mesaj}***", ephemeral=True)
     
 
-@bot.tree.command(name="atasozu", description="Random atasözü")
+@bot.tree.command(name="atasözü", description="Random atasözü")
 async def atasozu(interaction: discord.Interaction):
     guild_id = interaction.guild.id
     query = f"SELECT user_id, message FROM messages WHERE guild_id = {guild_id} ORDER BY RANDOM() LIMIT 1"
@@ -165,6 +166,129 @@ async def atasozu(interaction: discord.Interaction):
     response = template.format(user_id=user_id, message=message)
     await interaction.response.send_message(response)
 
+
+@bot.tree.command(name="müziköner", description="Müzik önerisi gönder. Spotify bağlantısı ile.")
+async def muzikoner(interaction: discord.Interaction, spotify_link: str):
+    
+    if not validate_spotify_url(spotify_link):
+        await interaction.response.send_message("Geçersiz Spotify bağlantısı.", ephemeral=True)
+        return
+    
+    track_id = spotify_link.split("?")[0].split("/")[-1]
+    track_url = f"https://open.spotify.com/track/{track_id}"
+
+    guild_id = interaction.guild.id
+    user_id = interaction.user.id
+
+    connection = create_connection(DB_NAME, USER, PASSWORD, HOST, PORT)
+
+    check_query = """
+    SELECT 1 FROM music_suggestions 
+    WHERE guild_id = %s AND user_id = %s AND url = %s;
+    """
+
+    check_values = (guild_id, user_id, track_url)
+    check_result = execute_read_query(connection, check_query, check_values)
+
+    if check_result:
+        await interaction.response.send_message("Bu şarkı zaten önerilmiş. Daha önce duymadığımız bir şarkı önerebilir misin?", ephemeral=True)
+        connection.close()
+        return
+
+    await interaction.response.send_message(f"<@{interaction.user.id}> bir şarkı önerdi!\n{track_url}")
+
+    username = interaction.user.name
+
+    query = """
+    INSERT INTO music_suggestions (guild_id, user_id, username, url)
+    VALUES (%s, %s, %s, %s)
+    """
+
+    values = (guild_id, user_id, username, track_url)
+    execute_query(connection, query, values)
+    connection.close()
+
+
+@bot.tree.command(name="randommüzik", description="Random müzik önerisi al.")
+async def randommuzik(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+
+    query = f"SELECT user_id, url, datetime FROM music_suggestions WHERE guild_id = {guild_id} ORDER BY RANDOM() LIMIT 1"
+    
+    connection = create_connection(DB_NAME, USER, PASSWORD, HOST, PORT)
+    result = execute_read_query(connection, query)
+    connection.close()
+
+    if not result:
+        await interaction.response.send_message("Henüz kimse bir şarkı önermemiş 😢")
+        return
+    
+    user_id, url, datetime = result[0]
+    datetime = datetime.strftime('%d.%m.%Y')
+    
+    await interaction.response.send_message(f"<@{user_id}> {datetime} tarihinde bu şarkıyı önermişti:\n{url}")
+
+
+@bot.tree.command(name="filmöner", description="Film önerisi gönder.")
+async def filmoner(interaction: discord.Interaction, film_link: str):
+    if not validate_film_url(film_link):
+        await interaction.response.send_message("Geçersiz film bağlantısı. Lütfen sadece IMDB veya LetterBoxd linkleri kullanın.", ephemeral=True)
+        return
+
+    film_url = film_link.split("?")[0]
+
+    guild_id = interaction.guild.id
+    user_id = interaction.user.id
+
+    connection = create_connection(DB_NAME, USER, PASSWORD, HOST, PORT)
+
+    check_query = """
+    SELECT 1 FROM movie_suggestions 
+    WHERE guild_id = %s AND user_id = %s AND url = %s;
+    """
+
+    check_values = (guild_id, user_id, film_url)
+    check_result = execute_read_query(connection, check_query, check_values)
+
+    if check_result:
+        await interaction.response.send_message("Bu film zaten önerilmiş. Daha önce izlediğimiz bir film önerebilir misin?", ephemeral=True)
+        connection.close()
+        return
+
+    await interaction.response.send_message(f"<@{interaction.user.id}> bir film önerdi!\n{film_url}")
+
+    username = interaction.user.name
+
+    query = """
+    INSERT INTO movie_suggestions (guild_id, user_id, username, url)
+    VALUES (%s, %s, %s, %s)
+    """
+
+    values = (guild_id, user_id, username, film_url)
+    execute_query(connection, query, values)
+    connection.close()
+
+
+@bot.tree.command(name="randomfilm", description="Random film önerisi al.")
+async def randomfilm(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+
+    query = f"SELECT user_id, url, datetime FROM movie_suggestions WHERE guild_id = {guild_id} ORDER BY RANDOM() LIMIT 1"
+    
+    connection = create_connection(DB_NAME, USER, PASSWORD, HOST, PORT)
+    result = execute_read_query(connection, query)
+    connection.close()
+
+    if not result:
+        await interaction.response.send_message("Henüz kimse bir film önermemiş 😢")
+        return
+    
+    user_id, url, datetime = result[0]
+    datetime = datetime.strftime('%d.%m.%Y')
+    
+    await interaction.response.send_message(f"<@{user_id}> {datetime} tarihinde bu filmi önermişti:\n{url}")
+
+
 if __name__ == "__main__":
     if not TOKEN:
         raise ValueError("DISCORD_TOKEN not found in environment variables.")
@@ -177,7 +301,7 @@ if __name__ == "__main__":
     if connection is None:
         raise ValueError("Database connection failed.")
     
-    # Create the messages table if it doesn't exist
+    # Create tables if it doesn't exist
     query = """CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
     guild_id BIGINT NOT NULL,
@@ -185,6 +309,24 @@ if __name__ == "__main__":
     username TEXT NOT NULL,
     message TEXT NOT NULL,
     datetime TIMESTAMP NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS music_suggestions (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    username TEXT NOT NULL,
+    url TEXT NOT NULL,
+    likes INTEGER DEFAULT 0,
+    datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS movie_suggestions (
+    id SERIAL PRIMARY KEY,
+    guild_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    username TEXT NOT NULL,
+    url TEXT NOT NULL,
+    likes INTEGER DEFAULT 0,
+    datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """
 
