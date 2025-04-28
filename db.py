@@ -43,26 +43,3 @@ def execute_read_query(connection, query):
     except Exception as e:
         print(f"The error '{e}' occurred")
         return None
-    
-def main():
-    connection = create_connection("railway", "postgres", "yfLEbMTMbRbtCHlYNEYONhvKYxsznzoA", "switchback.proxy.rlwy.net", "45837")
-
-    query = """CREATE TABLE IF NOT EXISTS messages (
-    id SERIAL PRIMARY KEY,
-    guild_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    username TEXT NOT NULL,
-    message TEXT NOT NULL,
-    datetime TIMESTAMP NOT NULL
-);
-"""
-
-    res = execute_query(connection, query)
-
-    if res:
-        for row in res:
-            print(row)
-    
-
-if __name__ == "__main__":
-    main()
