@@ -12,6 +12,13 @@ def validate_film_url(url: str):
             return True
     return False
 
-def validate_spotify_url(link):
-    pattern = r'^https://open\.spotify\.com/[^/]+/track/[A-Za-z0-9]+(?:\?.*)?$'
-    return bool(re.match(pattern, link))
+def validate_spotify_url(url: str): 
+    patterns = [
+        r'^https://open\.spotify\.com/[^/]+/track/[A-Za-z0-9]+(?:\?.*)?$',  
+        r'^https://open\.spotify\.com/track/[A-Za-z0-9]+(?:\?.*)?$'
+    ]
+    
+    for pattern in patterns:
+        if re.match(pattern, url):
+            return True
+    return False
