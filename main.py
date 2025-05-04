@@ -8,7 +8,7 @@ import math
 
 from dotenv import load_dotenv
 from db import create_connection, execute_query, execute_read_query
-from messages import bira_answers, atasozu_templates
+from messages import on_message_regex_responses, on_message_regex_reactions, atasozu_templates
 from utils import validate_film_url, validate_spotify_url
 
 load_dotenv()
@@ -33,12 +33,18 @@ async def on_message(message):
     if message.author == bot.user:
         return
     
-    if message.content.lower() == "sa":
-        await message.channel.send("as")
+    msg = message.content.lower()
 
-    if "bira" in message.content.lower():
-        await message.channel.send(random.choice(bira_answers))
-        await message.add_reaction("🍻")
+    for pattern, response in on_message_regex_responses:
+        if re.search(pattern, msg, re.IGNORECASE):
+            response = response(message) if callable(response) else response
+            await message.channel.send(response)
+            break
+
+    for pattern, emoji in on_message_regex_reactions:
+        if re.search(pattern, msg, re.IGNORECASE):
+            await message.add_reaction(emoji)
+            break
 
     await bot.process_commands(message)
 
@@ -123,8 +129,8 @@ async def announce_results(poll_message, poll):
 
 
 @bot.tree.command(name="yazkenara", description="Atasözü oluştur")
-async def yazkenara(interaction: discord.Interaction, mesaj: str):
-    if not mesaj:
+async def yazkenara(interaction: discord.Interaction, message: str):
+    if not message:
         interaction.response.send_message("Mesaj boş olamaz!", ephemeral=True)
         return
 
@@ -136,7 +142,6 @@ async def yazkenara(interaction: discord.Interaction, mesaj: str):
     guild_id = interaction.guild.id
     user_id = interaction.user.id
     username = interaction.user.name
-    message = mesaj
     datetime = interaction.created_at
     values = (guild_id, user_id, username, message, datetime)
 
@@ -144,7 +149,7 @@ async def yazkenara(interaction: discord.Interaction, mesaj: str):
     execute_query(connection, query, values)
     connection.close()
 
-    await interaction.response.send_message(f"Yeni bir atasözü ekledin: ***{mesaj}***", ephemeral=True)
+    await interaction.response.send_message(f"Yeni bir atasözü ekledin: ***{message}***", ephemeral=True)
     
 
 @bot.tree.command(name="atasözü", description="Random atasözü")
